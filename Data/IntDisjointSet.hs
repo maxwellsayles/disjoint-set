@@ -55,9 +55,9 @@ insert !x set@(IntDisjointSet p _)
                     
 {-|
 Insert x into the disjoint set such that there are no
-equivalence relations with x.  x *must* not already by
-in the set.
-Takes O(logn).
+equivalence relations with x.  x *must* not already be
+in the set, since this sets the rank of the singleton
+set {x} to rank 0. Takes O(logn).
 -}
 unsafeInsert :: Int -> IntDisjointSet -> IntDisjointSet
 unsafeInsert !x (IntDisjointSet p r) =
@@ -68,7 +68,8 @@ unsafeInsert !x (IntDisjointSet p r) =
 {-|
 Create an equivalence relation between x and y.
 Takes O(logn * \alpha(n))
-where \alpha(n) is the extremely slowly growing inverse Ackermann function.
+where \alpha(n) is the extremely slowly growing
+inverse Ackermann function.
 -}
 union :: Int -> Int -> IntDisjointSet -> IntDisjointSet
 union !x !y set = flip execState set $ runMaybeT $ do
@@ -93,7 +94,8 @@ union !x !y set = flip execState set $ runMaybeT $ do
 Find the set representative for this input.
 This performs path compression and so is stateful.
 Takes amortized O(logn * \alpha(n))
-where \alpha(n) is the extremely slowly growing inverse Ackermann function.
+where \alpha(n) is the extremely slowly growing
+inverse Ackermann function.
 -}
 lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set =
