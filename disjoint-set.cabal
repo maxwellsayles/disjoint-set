@@ -14,6 +14,7 @@ Author:              Maxwell Sayles <maxwellsayles@gmail.com>
 Maintainer:          Maxwell Sayles <maxwellsayles@gmail.com>
 Category:            Data
 Build-type:          Simple
+Stability:           Release
 Cabal-version:       >=1.6
 
 Library

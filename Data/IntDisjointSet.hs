@@ -4,12 +4,15 @@ module Data.IntDisjointSet (IntDisjointSet,
                             empty,
                             singleton,
                             insert,
+                            insertList,
                             unsafeInsert,
+                            unsafeMerge,
                             union,
                             lookup,
                             disjointSetSize,
                             size,
-                            map) where
+                            map,
+                            optimize) where
 
 import Control.Arrow
 import Control.Monad.State.Strict
@@ -54,6 +57,12 @@ insert !x set@(IntDisjointSet p _)
   | otherwise = unsafeInsert x set
                     
 {-|
+Insert all the elements from the list into the disjoint set.
+-}
+insertList :: [Int] -> IntDisjointSet -> IntDisjointSet
+insertList xs set = foldr insert set xs
+
+{-|
 Insert x into the disjoint set such that there are no
 equivalence relations with x.  x *must* not already be
 in the set, since this sets the rank of the singleton
@@ -64,6 +73,14 @@ unsafeInsert !x (IntDisjointSet p r) =
   let p' = IntMap.insert x x p
       r' = IntMap.insert x 0 r
   in  p' `seq` r' `seq` IntDisjointSet p' r'
+
+{-|
+Given two instances of disjoint sets that share no members in common,
+computes a third disjoint set that is the combination of the two.
+-}
+unsafeMerge :: IntDisjointSet -> IntDisjointSet -> IntDisjointSet
+unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
+    IntDisjointSet (IntMap.union p1 p2) (IntMap.union r1 r2)
 
 {-|
 Create an equivalence relation between x and y.
@@ -127,6 +144,18 @@ map f (IntDisjointSet p r) =
   let p' = IntMap.fromList $ List.map (f *** f) $ IntMap.toList p
       r' = IntMap.fromList $ List.map (first f) $ IntMap.toList r
   in  p' `seq` r' `seq` (IntDisjointSet p' r')
+
+{-|
+Optimize all the paths in the disjoint set so that each
+lookup operation takes O(logn) and does not modify state.
+This will not hold after additional modification to the set
+(e.g. insert or union).  This operation takes O(nlogn).
+-}
+optimize :: IntDisjointSet -> IntDisjointSet
+optimize set = flip execState set $
+               mapM_ (state . lookup) $
+               IntMap.keys $
+               parents set
 
 -- Find the set representative.
 -- This traverses parents until the parent of y == y and returns y.
