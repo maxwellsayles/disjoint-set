@@ -52,7 +52,7 @@ Takes O(logn).
 -}
 insert :: Int -> IntDisjointSet -> IntDisjointSet
 insert !x set@(IntDisjointSet p r) =
-    let (l, p') = IntMap.insertLookupWithKey (\_ _ -> id) x x p
+    let (l, p') = IntMap.insertLookupWithKey (\_ _ old -> old) x x p
     in  case l of
           Just _  -> set
           Nothing ->
@@ -78,6 +78,14 @@ Create an equivalence relation between x and y.
 Takes O(logn * \alpha(n))
 where \alpha(n) is the extremely slowly growing
 inverse Ackermann function.
+
+This function works by looking up the set representatives
+for both x and y.  If they are the same, it does nothing.
+Then it looks up the rank for both representatives and
+makes the tree of the smaller ranked representative a
+child of the tree of the larger ranked representative.
+If both representatives have the same rank, x is made a
+child of y and the rank of y is increase by 1.
 -}
 union :: Int -> Int -> IntDisjointSet -> IntDisjointSet
 union !x !y set = flip execState set $ runMaybeT $ do
@@ -160,10 +168,11 @@ find !x (IntDisjointSet p _) =
 -- Given a start node and its representative, compress
 -- the path to the root.
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-compress !x !rep set@(IntDisjointSet p r)
-  | x == rep = set
-  | otherwise = compress x' rep set'
-    where x'   = p IntMap.! x
-          set' = let p' = IntMap.insert x rep p
-                 in  p' `seq` IntDisjointSet p' r
+compress !x !rep set = helper x set
+    where helper !x set@(IntDisjointSet p r)
+              | x == rep = set
+              | otherwise = helper x' set'
+              where x'   = p IntMap.! x
+                    set' = let p' = IntMap.insert x rep p
+                           in  p' `seq` IntDisjointSet p' r
   
