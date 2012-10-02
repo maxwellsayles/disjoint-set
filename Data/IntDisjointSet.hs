@@ -170,9 +170,9 @@ find !x (IntDisjointSet p _) =
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
 compress !x !rep set = helper x set
     where helper !x set@(IntDisjointSet p r)
-              | x == rep = set
+              | x == rep  = set
               | otherwise = helper x' set'
-              where x'   = p IntMap.! x
-                    set' = let p' = IntMap.insert x rep p
-                           in  p' `seq` IntDisjointSet p' r
+              where x'    = p IntMap.! x
+                    set'  = let p' = IntMap.insert x rep p
+                            in  p' `seq` IntDisjointSet p' r
   
