@@ -5,7 +5,6 @@ module Data.IntDisjointSet (IntDisjointSet,
                             singleton,
                             insert,
                             insertList,
-                            unsafeInsert,
                             unsafeMerge,
                             union,
                             lookup,
@@ -52,27 +51,19 @@ otherwise x has no equivalence relations.
 Takes O(logn).
 -}
 insert :: Int -> IntDisjointSet -> IntDisjointSet
-insert !x set@(IntDisjointSet p _)
-  | IntMap.member x p = set
-  | otherwise = unsafeInsert x set
+insert !x set@(IntDisjointSet p r) =
+    let (l, p') = IntMap.insertLookupWithKey (\_ _ -> id) x x p
+    in  case l of
+          Just _  -> set
+          Nothing ->
+              let r' = IntMap.insert x 0 r
+              in  p' `seq` r' `seq` IntDisjointSet p' r'
                     
 {-|
 Insert all the elements from the list into the disjoint set.
 -}
 insertList :: [Int] -> IntDisjointSet -> IntDisjointSet
 insertList xs set = foldr insert set xs
-
-{-|
-Insert x into the disjoint set such that there are no
-equivalence relations with x.  x *must* not already be
-in the set, since this sets the rank of the singleton
-set {x} to rank 0. Takes O(logn).
--}
-unsafeInsert :: Int -> IntDisjointSet -> IntDisjointSet
-unsafeInsert !x (IntDisjointSet p r) =
-  let p' = IntMap.insert x x p
-      r' = IntMap.insert x 0 r
-  in  p' `seq` r' `seq` IntDisjointSet p' r'
 
 {-|
 Given two instances of disjoint sets that share no members in common,
