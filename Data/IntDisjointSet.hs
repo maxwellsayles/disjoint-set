@@ -27,6 +27,7 @@ Represents a disjoint set of integers.
 -}
 data IntDisjointSet = IntDisjointSet { parents :: IntMap Int,
                                        ranks   :: IntMap Int }
+  deriving (Show)
 
 {-|
 Create a disjoint set with no members.
@@ -168,7 +169,7 @@ find !x (IntDisjointSet p _) =
 -- Given a start node and its representative, compress
 -- the path to the root.
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-compress !x !rep set = helper x set
+compress !outerx !rep outerset = helper outerx outerset
     where helper !x set@(IntDisjointSet p r)
               | x == rep  = set
               | otherwise = helper x' set'
