@@ -103,7 +103,7 @@ union !x !y set = flip execState set $ runMaybeT $ do
               r' = IntMap.delete repy r
           in  p' `seq` r' `seq` IntDisjointSet p' r'
     EQ -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx $! IntMap.insert repy (succ ranky) r
+              r' = IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
           in  p' `seq` r' `seq` IntDisjointSet p' r'
 
 {-|
@@ -142,7 +142,7 @@ map :: (Int -> Int) -> IntDisjointSet -> IntDisjointSet
 map f (IntDisjointSet p r) =
   let p' = IntMap.fromList $ List.map (f *** f) $ IntMap.toList p
       r' = IntMap.fromList $ List.map (first f) $ IntMap.toList r
-  in  p' `seq` r' `seq` (IntDisjointSet p' r')
+  in  p' `seq` r' `seq` IntDisjointSet p' r'
 
 {-|
 Optimize all the paths in the disjoint set so that each
