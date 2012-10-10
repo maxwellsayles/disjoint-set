@@ -22,7 +22,7 @@ Cabal-version:       >= 1.8
 
 Library
   Exposed-modules:   Data.IntDisjointSet
-  Build-depends:     base >= 4,
+  Build-depends:     base >= 3 && < 5,
                      containers >= 0.3,
                      mtl >= 2,
                      transformers >= 0.3
