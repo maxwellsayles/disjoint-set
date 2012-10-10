@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-{-|
+{- |
 Module      : Data.IntDisjointSet
 Description : Persistent Disjoint-Sets (a.k.a. Union-Find)
 Copyright   : (c) 2012 Maxwell Sayles.
@@ -11,9 +11,11 @@ Stability   : stable
 Portability : non-portable (only tested with GHC 6.12.3)
 
 Persistent Disjoint-Sets (a.k.a. Union-Find).  This implements
-disjoint-sets according to the description given in "Introduction
-to Algorithms" by Cormen et al.  Most functions incur an additional
-O(logn) overhead due to the use of persistent maps.
+disjoint-sets according to the description given in
+\"/Introduction to Algorithms/\" by Cormen et al
+(<http://mitpress.mit.edu/algorithms>).
+Most functions incur an additional O(logn) overhead due to the use
+of persistent maps.
 
 Disjoint-sets are a set of elements with equivalence relations defined
 between elements, i.e. two elements may be members of the same equivalence
@@ -70,14 +72,14 @@ instance Show IntDisjointSet where
 
 {-|
 Create a disjoint set with no members.
-Takes O(1).
+O(1).
 -}
 empty :: IntDisjointSet
 empty = IntDisjointSet IntMap.empty IntMap.empty
 
 {-|
 Create a disjoint set with one member.
-Takes O(1).
+O(1).
 -}
 singleton :: Int -> IntDisjointSet
 singleton !x = let p = IntMap.singleton x x
@@ -88,7 +90,7 @@ singleton !x = let p = IntMap.singleton x x
 Insert x into the disjoint set.
 If it is already a member, then do nothing,
 otherwise x has no equivalence relations.
-Takes O(logn).
+O(logn).
 -}
 insert :: Int -> IntDisjointSet -> IntDisjointSet
 insert !x set@(IntDisjointSet p r) =
@@ -113,7 +115,8 @@ unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
 
 {-|
 Create an equivalence relation between x and y.
-Takes O(logn * \alpha(n))
+
+Amortized O(logn * \alpha(n))
 where \alpha(n) is the extremely slowly growing
 inverse Ackermann function.
 
@@ -147,7 +150,8 @@ union !x !y set = flip execState set $ runMaybeT $ do
 {-|
 Find the set representative for this input.
 This performs path compression and so is stateful.
-Takes amortized O(logn * \alpha(n))
+
+Amortized O(logn * \alpha(n))
 where \alpha(n) is the extremely slowly growing
 inverse Ackermann function.
 -}
@@ -189,14 +193,14 @@ equivalent !x !y set = first (fromMaybe False) $
 
 {-|
 Return the number of disjoint sets.
-Takes O(1).
+O(1).
 -}
 disjointSetSize :: IntDisjointSet -> Int
 disjointSetSize = IntMap.size . ranks
 
 {-|
 Return the number of elements in all disjoint sets.
-Takes O(1).
+O(1).
 -}
 size :: IntDisjointSet -> Int
 size = IntMap.size . parents
