@@ -16,14 +16,13 @@ Author:              Maxwell Sayles <maxwellsayles@gmail.com>
 Maintainer:          Maxwell Sayles <maxwellsayles@gmail.com>
 Category:            Data
 Build-type:          Simple
-Stability:           Release
-Cabal-version:       >=1.6
+Stability:           stable
+Homepage:            https://github.com/maxwellsayles/disjoint-set
+Cabal-version:       >= 1.8
 
 Library
   Exposed-modules:   Data.IntDisjointSet
-  Build-depends:     base >= 3 && < 5,
+  Build-depends:     base >= 4,
                      containers >= 0.3,
                      mtl >= 2,
                      transformers >= 0.3
-
-
