@@ -159,7 +159,7 @@ lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set =
   case find x set of
     Nothing  -> (Nothing, set)
-    Just rep -> let set' = compress x rep set
+    Just rep -> let set' = compress rep x set
                 in  set' `seq` (Just rep, set')
 
 {-| Return a list of all the elements. -}
@@ -227,7 +227,7 @@ find !x (IntDisjointSet p _) =
 -- Given a start node and its representative, compress
 -- the path to the root.
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-compress !x !rep set = helper x set
+compress !rep = helper
     where helper !x set@(IntDisjointSet p r)
               | x == rep  = set
               | otherwise = helper x' set'

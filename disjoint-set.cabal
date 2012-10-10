@@ -22,6 +22,7 @@ Cabal-version:       >= 1.8
 
 Library
   Exposed-modules:   Data.IntDisjointSet
+  GHC-Options:       -O3 -Wall -Werror
   Build-depends:     base >= 3 && < 5,
                      containers >= 0.3,
                      mtl >= 2,
