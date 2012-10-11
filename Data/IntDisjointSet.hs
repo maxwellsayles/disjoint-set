@@ -1,22 +1,61 @@
 {-# LANGUAGE BangPatterns #-}
 
+{- |
+Module      : Data.IntDisjointSet
+Description : Persistent Disjoint-Sets (a.k.a. Union-Find)
+Copyright   : (c) 2012 Maxwell Sayles.
+License     : LGPL
+
+Maintainer  : maxwellsayles@gmail.com
+Stability   : stable
+Portability : non-portable (only tested with GHC 6.12.3)
+
+Persistent Disjoint-Sets (a.k.a. Union-Find).  This implements
+disjoint-sets according to the description given in
+\"/Introduction to Algorithms/\" by Cormen et al
+(<http://mitpress.mit.edu/algorithms>).
+Most functions incur an additional O(logn) overhead due to the use
+of persistent maps.
+
+Disjoint-sets are a set of elements with equivalence relations defined
+between elements, i.e. two elements may be members of the same equivalence
+set. Each element has a set representative. The implementation works by
+maintaining a map from an element to its parent. When an element is its
+own parent, it is the set representative. Two elements are part of the
+same equivalence set when their set representatives are the same.
+
+In order to find the set representative efficiently, after each traversal
+from an element to its representative, we compress the path so that
+each element on the path points directly to the set representative.  For
+this to be persistent, lookup is stateful and so returns the result
+of the lookup and a new disjoint set.
+
+Additionally, to make sure that path lengths grow logarithmically, we
+maintain the rank of a set. This is a logarithmic upper bound on the 
+number of elements in each set. When we compute the union of two sets,
+we make the set with the smaller rank a child of the set with the larger
+rank. When two sets have equal rank, the first set is a child of the second
+and the rank of the second is increased by 1.
+-}
+
 module Data.IntDisjointSet (IntDisjointSet,
                             empty,
                             singleton,
                             insert,
-                            insertList,
                             unsafeMerge,
                             union,
                             lookup,
+                            elems,
+                            toList,
+                            fromList,
+                            equivalent,
                             disjointSetSize,
                             size,
-                            map,
-                            optimize) where
+                            map) where
 
 import Control.Arrow
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Maybe
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.List as List
 import Data.Maybe
@@ -25,20 +64,22 @@ import Prelude hiding (lookup, map)
 {-|
 Represents a disjoint set of integers.
 -}
-data IntDisjointSet = IntDisjointSet { parents :: IntMap Int,
-                                       ranks   :: IntMap Int }
-  deriving (Show)
+data IntDisjointSet = IntDisjointSet { parents :: IntMap.IntMap Int,
+                                       ranks   :: IntMap.IntMap Int }
+
+instance Show IntDisjointSet where
+    show = ("fromList " ++) . show . fst . toList
 
 {-|
 Create a disjoint set with no members.
-Takes O(1).
+O(1).
 -}
 empty :: IntDisjointSet
 empty = IntDisjointSet IntMap.empty IntMap.empty
 
 {-|
 Create a disjoint set with one member.
-Takes O(1).
+O(1).
 -}
 singleton :: Int -> IntDisjointSet
 singleton !x = let p = IntMap.singleton x x
@@ -49,7 +90,7 @@ singleton !x = let p = IntMap.singleton x x
 Insert x into the disjoint set.
 If it is already a member, then do nothing,
 otherwise x has no equivalence relations.
-Takes O(logn).
+O(logn).
 -}
 insert :: Int -> IntDisjointSet -> IntDisjointSet
 insert !x set@(IntDisjointSet p r) =
@@ -61,14 +102,12 @@ insert !x set@(IntDisjointSet p r) =
               in  p' `seq` r' `seq` IntDisjointSet p' r'
                     
 {-|
-Insert all the elements from the list into the disjoint set.
--}
-insertList :: [Int] -> IntDisjointSet -> IntDisjointSet
-insertList xs set = foldr insert set xs
-
-{-|
 Given two instances of disjoint sets that share no members in common,
 computes a third disjoint set that is the combination of the two.
+
+This method is unsafe in that is does not verify that the two input
+sets share no members in common and in the event that a member
+overlaps, the resulting set may have incorrect equivalence relations.
 -}
 unsafeMerge :: IntDisjointSet -> IntDisjointSet -> IntDisjointSet
 unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
@@ -76,7 +115,8 @@ unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
 
 {-|
 Create an equivalence relation between x and y.
-Takes O(logn * \alpha(n))
+
+Amortized O(logn * \alpha(n))
 where \alpha(n) is the extremely slowly growing
 inverse Ackermann function.
 
@@ -104,13 +144,14 @@ union !x !y set = flip execState set $ runMaybeT $ do
               r' = IntMap.delete repy r
           in  p' `seq` r' `seq` IntDisjointSet p' r'
     EQ -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx $! IntMap.insert repy (succ ranky) r
+              r' = IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
           in  p' `seq` r' `seq` IntDisjointSet p' r'
 
 {-|
 Find the set representative for this input.
 This performs path compression and so is stateful.
-Takes amortized O(logn * \alpha(n))
+
+Amortized O(logn * \alpha(n))
 where \alpha(n) is the extremely slowly growing
 inverse Ackermann function.
 -}
@@ -118,19 +159,48 @@ lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set =
   case find x set of
     Nothing  -> (Nothing, set)
-    Just rep -> let set' = compress x rep set
+    Just rep -> let set' = compress rep x set
                 in  set' `seq` (Just rep, set')
+
+{-| Return a list of all the elements. -}
+-- This is stateful for consistency and possible future revisions.
+elems :: IntDisjointSet -> ([Int], IntDisjointSet)
+elems = IntMap.keys . parents &&& id
+
+{-| Generate an association list of each element and its representative. -}
+toList :: IntDisjointSet -> ([(Int, Int)], IntDisjointSet)
+toList set = flip runState set $ do
+               xs <- state elems
+               forM xs $ \x -> do
+                 Just rep <- state $ lookup x
+                 return (x, rep)
+
+{-|
+Given an association list representing equivalences between elements,
+generate the corresponding disjoint-set.
+-}
+fromList :: [(Int, Int)] -> IntDisjointSet
+fromList = foldr (\(x, y) -> union x y . insert y . insert x) empty
+
+{-| True if both elements belong to the same set. -}
+equivalent :: Int -> Int -> IntDisjointSet -> (Bool, IntDisjointSet)
+equivalent !x !y set = first (fromMaybe False) $
+                       flip runState set $
+                       runMaybeT $ do
+                         repx <- MaybeT $ state $ lookup x
+                         repy <- MaybeT $ state $ lookup y
+                         return $! repx == repy
 
 {-|
 Return the number of disjoint sets.
-Takes O(1).
+O(1).
 -}
 disjointSetSize :: IntDisjointSet -> Int
 disjointSetSize = IntMap.size . ranks
 
 {-|
 Return the number of elements in all disjoint sets.
-Takes O(1).
+O(1).
 -}
 size :: IntDisjointSet -> Int
 size = IntMap.size . parents
@@ -143,19 +213,7 @@ map :: (Int -> Int) -> IntDisjointSet -> IntDisjointSet
 map f (IntDisjointSet p r) =
   let p' = IntMap.fromList $ List.map (f *** f) $ IntMap.toList p
       r' = IntMap.fromList $ List.map (first f) $ IntMap.toList r
-  in  p' `seq` r' `seq` (IntDisjointSet p' r')
-
-{-|
-Optimize all the paths in the disjoint set so that each
-lookup operation takes O(logn) and does not modify state.
-This will not hold after additional modification to the set
-(e.g. insert or union).  This operation takes O(nlogn).
--}
-optimize :: IntDisjointSet -> IntDisjointSet
-optimize set = flip execState set $
-               mapM_ (state . lookup) $
-               IntMap.keys $
-               parents set
+  in  p' `seq` r' `seq` IntDisjointSet p' r'
 
 -- Find the set representative.
 -- This traverses parents until the parent of y == y and returns y.
@@ -169,11 +227,11 @@ find !x (IntDisjointSet p _) =
 -- Given a start node and its representative, compress
 -- the path to the root.
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-compress !outerx !rep outerset = helper outerx outerset
+compress !rep = helper
     where helper !x set@(IntDisjointSet p r)
               | x == rep  = set
               | otherwise = helper x' set'
               where x'    = p IntMap.! x
                     set'  = let p' = IntMap.insert x rep p
                             in  p' `seq` IntDisjointSet p' r
-  
+

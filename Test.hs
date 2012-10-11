@@ -41,6 +41,9 @@ findSet a sids = S.fold f S.empty sids
 getElements :: SlowIntDisjointSet -> S.Set Int
 getElements sids = S.fold S.union S.empty sids
 
+insertList :: [Int] -> IntDisjointSet -> IntDisjointSet
+insertList xs set = foldr insert set xs
+
 ---------------------------------------------------------
 
 newtype IntDisjointSets = IntDisjointSets (IntDisjointSet, SlowIntDisjointSet)
@@ -114,9 +117,6 @@ optimizeByLookup :: IntDisjointSets -> IntDisjointSets
 optimizeByLookup (IntDisjointSets (ids, sids)) = IntDisjointSets (optimized, sids)
   where optimized = foldl (\ ids' e -> snd $ lookup e ids') ids $ S.toList $ getElements sids
 
-optimizeByOptimize :: IntDisjointSets -> IntDisjointSets
-optimizeByOptimize (IntDisjointSets (ids, sids)) = IntDisjointSets (optimize ids, sids)
-
 optimizeByMap :: IntDisjointSets -> IntDisjointSets
 optimizeByMap (IntDisjointSets (ids, sids)) = IntDisjointSets (Data.IntDisjointSet.map (+ 1) ids, S.map (S.map (+ 1)) sids)
 
@@ -165,7 +165,6 @@ main = do
                                              y <- [ optimizeByNone
                                                   , optimizeByNone
                                                   , optimizeByLookup
-                                                  , optimizeByOptimize
                                                   , optimizeByMap
                                                   , optimizeByMerge
                                                   ]]
