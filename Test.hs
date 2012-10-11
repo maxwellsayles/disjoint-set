@@ -188,6 +188,20 @@ testNumberOfSetsAreSame :: IntDisjointSets -> Bool
 testNumberOfSetsAreSame (IntDisjointSets (ids, sids)) = disjointSetSize ids ==
   S.size sids
 
+insertAndTest :: Int -> (Bool, IntDisjointSet) -> (Bool, IntDisjointSet)
+insertAndTest x (_, set) =
+  let set' = insert x set
+  in  case lookup x set of
+        -- x was already in set. The two sets should be unchanged.
+        (Just _, _) -> (fst (toList set) == fst (toList set'), set')
+        -- x is new to the set. The sets should be unchanged except for entry x.
+        (Nothing, _) -> let xs = fst $ toList set'
+                   in  ((x,x) `L.elem` xs &&
+                        L.sort (L.delete (x,x) xs) == L.sort (fst (toList set)), set')
+
+testInsertAndTest :: [Int] -> Bool
+testInsertAndTest l = all fst $ scanl (flip insertAndTest) (True, empty) l
+
 ------------------------------------------------------------
 
 {-|
@@ -280,3 +294,5 @@ main = do
                                                   , optimizeByMap
                                                   , optimizeByMerge
                                                   ]]
+
+  runQuickCheckAndGuard testInsertAndTest
