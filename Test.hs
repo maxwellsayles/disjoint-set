@@ -193,7 +193,7 @@ insertAndTest x (_, set) =
   let set' = insert x set
   in  case lookup x set of
         -- x was already in set. The two sets should be unchanged.
-        (Just _, _) -> (fst (toList set) == fst (toList set'), set')
+        (Just _, _) -> (L.sort (fst (toList set)) == L.sort (fst (toList set')), set')
         -- x is new to the set. The sets should be unchanged except for entry x.
         (Nothing, _) -> let xs = fst $ toList set'
                    in  ((x,x) `L.elem` xs &&
@@ -201,6 +201,20 @@ insertAndTest x (_, set) =
 
 testInsertAndTest :: [Int] -> Bool
 testInsertAndTest l = all fst $ scanl (flip insertAndTest) (True, empty) l
+
+unionAndTest :: (Int, Int) -> (Bool, IntDisjointSet) -> (Bool, IntDisjointSet)
+unionAndTest (x', y') (_, set) = case (lookup x' set, lookup y' set) of
+  -- Both elements are present, but they may be in the same set
+  ((Just x, _), (Just y, _)) -> (if x == y then L.sort (fst (toList set)) ==
+                                                L.sort (fst (toList unioned))
+                                   else size unioned == size set &&
+                                     disjointSetSize unioned == disjointSetSize set - 1,
+                                 unioned)
+  _ -> (True, set)
+  where unioned = union x' y' set
+  
+testUnionAndTest :: (IntDisjointSets, [(Int, Int)]) -> Bool
+testUnionAndTest (IntDisjointSets (ids, _), l) = all fst $ scanl (flip unionAndTest) (True, ids) l
 
 ------------------------------------------------------------
 
@@ -296,3 +310,4 @@ main = do
                                                   ]]
 
   runQuickCheckAndGuard testInsertAndTest
+  runQuickCheckAndGuard testUnionAndTest
