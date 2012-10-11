@@ -10,7 +10,7 @@ Description:         This is a persistent data structure for disjoint sets.
                      persistent maps.
                      .
                      Data.IntDisjointSet is as strict as possible.
-License:             LGPL
+License:             BSD3
 License-file:        LICENSE
 Author:              Maxwell Sayles <maxwellsayles@gmail.com>
 Maintainer:          Maxwell Sayles <maxwellsayles@gmail.com>
