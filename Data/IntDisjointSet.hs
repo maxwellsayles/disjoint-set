@@ -61,26 +61,18 @@ import qualified Data.List as List
 import Data.Maybe
 import Prelude hiding (lookup, map)
 
-{-|
-Represents a disjoint set of integers.
--}
+{-| Represents a disjoint set of integers. -}
 data IntDisjointSet = IntDisjointSet { parents :: IntMap.IntMap Int,
                                        ranks   :: IntMap.IntMap Int }
 
 instance Show IntDisjointSet where
     show = ("fromList " ++) . show . fst . toList
 
-{-|
-Create a disjoint set with no members.
-O(1).
--}
+{-| Create a disjoint set with no members. O(1). -}
 empty :: IntDisjointSet
 empty = IntDisjointSet IntMap.empty IntMap.empty
 
-{-|
-Create a disjoint set with one member.
-O(1).
--}
+{-| Create a disjoint set with one member. O(1). -}
 singleton :: Int -> IntDisjointSet
 singleton !x = let p = IntMap.singleton x x
                    r = IntMap.singleton x 0
@@ -127,6 +119,8 @@ makes the tree of the smaller ranked representative a
 child of the tree of the larger ranked representative.
 If both representatives have the same rank, x is made a
 child of y and the rank of y is increase by 1.
+
+If either x or y is not present in the input set, nothing is done.
 -}
 union :: Int -> Int -> IntDisjointSet -> IntDisjointSet
 union !x !y set = flip execState set $ runMaybeT $ do
@@ -167,7 +161,10 @@ lookup !x set =
 elems :: IntDisjointSet -> ([Int], IntDisjointSet)
 elems = IntMap.keys . parents &&& id
 
-{-| Generate an association list of each element and its representative. -}
+{-|
+Generate an association list of each element and its representative,
+in arbitrary order.
+-}
 toList :: IntDisjointSet -> ([(Int, Int)], IntDisjointSet)
 toList set = flip runState set $ do
                xs <- state elems
@@ -191,17 +188,11 @@ equivalent !x !y set = first (fromMaybe False) $
                          repy <- MaybeT $ state $ lookup y
                          return $! repx == repy
 
-{-|
-Return the number of disjoint sets.
-O(1).
--}
+{-| Return the number of disjoint sets. O(1). -}
 disjointSetSize :: IntDisjointSet -> Int
 disjointSetSize = IntMap.size . ranks
 
-{-|
-Return the number of elements in all disjoint sets.
-O(1).
--}
+{-| Return the number of elements in all disjoint sets. O(1). -}
 size :: IntDisjointSet -> Int
 size = IntMap.size . parents
 
