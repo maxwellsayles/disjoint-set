@@ -4,7 +4,7 @@
 Module      : Data.IntDisjointSet
 Description : Persistent Disjoint-Sets (a.k.a. Union-Find)
 Copyright   : (c) 2012 Maxwell Sayles.
-License     : LGPL
+License     : BSD3
 
 Maintainer  : maxwellsayles@gmail.com
 Stability   : stable
@@ -36,6 +36,9 @@ number of elements in each set. When we compute the union of two sets,
 we make the set with the smaller rank a child of the set with the larger
 rank. When two sets have equal rank, the first set is a child of the second
 and the rank of the second is increased by 1.
+
+Below \alpha(n) refers to the extremely slowly growing inverse Ackermann
+function.
 -}
 
 module Data.IntDisjointSet (IntDisjointSet,
@@ -92,7 +95,7 @@ insert !x set@(IntDisjointSet p r) =
           Nothing ->
               let r' = IntMap.insert x 0 r
               in  p' `seq` r' `seq` IntDisjointSet p' r'
-                    
+
 {-|
 Given two instances of disjoint sets that share no members in common,
 computes a third disjoint set that is the combination of the two.
@@ -107,10 +110,7 @@ unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
 
 {-|
 Create an equivalence relation between x and y.
-
-Amortized O(logn * \alpha(n))
-where \alpha(n) is the extremely slowly growing
-inverse Ackermann function.
+Amortized O(logn * \alpha(n)).
 
 This function works by looking up the set representatives
 for both x and y.  If they are the same, it does nothing.
@@ -144,10 +144,7 @@ union !x !y set = flip execState set $ runMaybeT $ do
 {-|
 Find the set representative for this input.
 This performs path compression and so is stateful.
-
-Amortized O(logn * \alpha(n))
-where \alpha(n) is the extremely slowly growing
-inverse Ackermann function.
+Amortized O(logn * \alpha(n)).
 -}
 lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set =
