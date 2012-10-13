@@ -1,3 +1,18 @@
+{- |
+Module      :  Test.hs
+Description :  Testing the Data.IntDisjointSet module
+
+Copyright   :  (c) Myles C. Maxfield
+License     :  BSD3
+
+Maintainer  :  litherum@gmail.com
+Stability   :  provisional
+Portability :  portable
+
+This file has a main function, and is meant to be run from the command-line.
+The return code of the program determines the success of the tests.
+-}
+
 import Control.Category
 import Control.Arrow hiding (left, right)
 import Control.Monad (guard)
