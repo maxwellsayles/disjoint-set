@@ -1,5 +1,5 @@
 Name:                disjoint-set
-Version:             0.1
+Version:             0.2
 Synopsis:            Persistent disjoint-sets, a.k.a union-find.
 Description:         This is a persistent data structure for disjoint sets.
                      .
@@ -12,8 +12,8 @@ Description:         This is a persistent data structure for disjoint sets.
                      Data.IntDisjointSet is as strict as possible.
 License:             BSD3
 License-file:        LICENSE
-Author:              Maxwell Sayles <maxwellsayles@gmail.com>
-Maintainer:          Maxwell Sayles <maxwellsayles@gmail.com>
+Author:              Maxwell Sayles, Myles Maxfield
+Maintainer:          <maxwellsayles@gmail.com>, <myles.maxfield@gmail.com>
 Category:            Data
 Build-type:          Simple
 Stability:           stable
