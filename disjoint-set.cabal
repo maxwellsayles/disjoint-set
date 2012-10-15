@@ -27,3 +27,16 @@ Library
                      containers >= 0.3,
                      mtl >= 2,
                      transformers >= 0.3
+
+test-suite test
+  main-is: Test.hs
+  type: exitcode-stdio-1.0
+  hs-source-dirs: .
+
+  ghc-options:   -Wall
+  build-depends: base >= 3 && < 5,
+                 HUnit,
+                 QuickCheck,
+                 containers >= 0.3,
+                 mtl >= 2,
+                 transformers >= 0.3
