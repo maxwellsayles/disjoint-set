@@ -20,6 +20,10 @@ Stability:           stable
 Homepage:            https://github.com/maxwellsayles/disjoint-set
 Cabal-version:       >= 1.8
 
+source-repository head
+  type:              git
+  location:          git://github.com/maxwellsayles/disjoint-set.git
+
 Library
   Exposed-modules:   Data.IntDisjointSet
   GHC-Options:       -O3 -Wall
