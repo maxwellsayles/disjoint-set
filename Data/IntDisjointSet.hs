@@ -46,7 +46,7 @@ module Data.IntDisjointSet (IntDisjointSet,
                             singleton,
                             insert,
                             unsafeMerge,
-                            union,
+                            union, unionRep,
                             lookup,
                             elems,
                             toList,
@@ -130,19 +130,27 @@ child of y and the rank of y is increase by 1.
 If either x or y is not present in the input set, nothing is done.
 -}
 union :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-union !x !y set = flip execState set $ runMaybeT $ do
-  (repx, rankx) <- MaybeT $ state $ lookup' x
-  (repy, ranky) <- MaybeT $ state $ lookup' y
-  guard $ repx /= repy
-  IntDisjointSet count newSet <- get
-  let unify low high = IntMap.insert low (NodeLink high) newSet
-  put $! IntDisjointSet (count-1) $ case compare rankx ranky of
-    LT -> unify repx repy
-    GT -> unify repy repx
-    EQ -> IntMap.insert repy (NodeRepresentative (ranky + 1)) $ unify repx repy
+union x y set = snd $ unionRep x y set
 
-lookup' :: Int -> IntDisjointSet -> (Maybe (Int, Rank), IntDisjointSet)
-lookup' !x set =
+unionRep :: Int -> Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
+unionRep !x !y set = flip runState set $ runMaybeT $ do
+  (repx, rankx) <- MaybeT $ state $ compressedFind x
+  (repy, ranky) <- MaybeT $ state $ compressedFind y
+  if repx == repy
+    then return repx
+    else do
+      IntDisjointSet count newSet <- get
+      let unify low high updateRank = do
+            put $! IntDisjointSet (count-1) $ updateRank $
+              IntMap.insert low (NodeLink high) newSet
+            return high
+      case compare rankx ranky of
+        LT -> unify repx repy id
+        GT -> unify repy repx id
+        EQ -> unify repx repy $ IntMap.insert repy (NodeRepresentative (ranky + 1))
+
+compressedFind :: Int -> IntDisjointSet -> (Maybe (Int, Rank), IntDisjointSet)
+compressedFind !x set =
   case find x set of
     Nothing          -> (Nothing, set)
     Just (rep, rank) -> let !compressedSet = compress rep x set
@@ -156,7 +164,7 @@ Amortized O(logn * \alpha(n)).
 lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set = (fmap fst mPair, newSet)
   where
-    (mPair, newSet) = lookup' x set
+    (mPair, newSet) = compressedFind x set
 
 {-| Return a list of all the elements. -}
 -- This is stateful for consistency and possible future revisions.
