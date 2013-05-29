@@ -77,9 +77,7 @@ empty = IntDisjointSet IntMap.empty IntMap.empty
 
 {-| Create a disjoint set with one member. O(1). -}
 singleton :: Int -> IntDisjointSet
-singleton !x = let p = IntMap.singleton x x
-                   r = IntMap.singleton x 0
-               in  p `seq` r `seq` IntDisjointSet p r
+singleton !x = (IntDisjointSet $! IntMap.singleton x x) $! IntMap.singleton x 0
 
 {-|
 Insert x into the disjoint set.
@@ -92,9 +90,7 @@ insert !x set@(IntDisjointSet p r) =
     let (l, p') = IntMap.insertLookupWithKey (\_ _ old -> old) x x p
     in  case l of
           Just _  -> set
-          Nothing ->
-              let r' = IntMap.insert x 0 r
-              in  p' `seq` r' `seq` IntDisjointSet p' r'
+          Nothing -> (IntDisjointSet $! p') $! IntMap.insert x 0 r
 
 {-|
 Given two instances of disjoint sets that share no members in common,
@@ -131,15 +127,9 @@ union !x !y set = flip execState set $ runMaybeT $ do
   let rankx = r IntMap.! repx
   let ranky = r IntMap.! repy
   put $! case compare rankx ranky of
-    LT -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
-    GT -> let p' = IntMap.insert repy repx p
-              r' = IntMap.delete repy r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
-    EQ -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
+    LT -> (IntDisjointSet $! IntMap.insert repx repy p) $! IntMap.delete repx $! r
+    GT -> (IntDisjointSet $! IntMap.insert repy repx p) $! IntMap.delete repy $! r
+    EQ -> (IntDisjointSet $! IntMap.insert repx repy p) $! IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
 
 {-|
 Find the set representative for this input.
@@ -150,8 +140,8 @@ lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
 lookup !x set =
   case find x set of
     Nothing  -> (Nothing, set)
-    Just rep -> let set' = compress rep x set
-                in  set' `seq` (Just rep, set')
+    Just rep -> let !compressedSet = compress rep x set
+                in  (Just rep, compressedSet)
 
 {-| Return a list of all the elements. -}
 -- This is stateful for consistency and possible future revisions.
@@ -201,7 +191,7 @@ map :: (Int -> Int) -> IntDisjointSet -> IntDisjointSet
 map f (IntDisjointSet p r) =
   let p' = IntMap.fromList $ List.map (f *** f) $ IntMap.toList p
       r' = IntMap.fromList $ List.map (first f) $ IntMap.toList r
-  in  p' `seq` r' `seq` IntDisjointSet p' r'
+  in  (IntDisjointSet $! p') $! r'
 
 -- Find the set representative.
 -- This traverses parents until the parent of y == y and returns y.
@@ -220,6 +210,4 @@ compress !rep = helper
               | x == rep  = set
               | otherwise = helper x' set'
               where x'    = p IntMap.! x
-                    set'  = let p' = IntMap.insert x rep p
-                            in  p' `seq` IntDisjointSet p' r
-
+                    set'  = (IntDisjointSet $! IntMap.insert x rep p) r
