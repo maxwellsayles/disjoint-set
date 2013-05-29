@@ -46,7 +46,7 @@ module Data.IntDisjointSet (IntDisjointSet,
                             singleton,
                             insert,
                             unsafeMerge,
-                            union,
+                            union, unionRep,
                             lookup,
                             elems,
                             toList,
@@ -64,22 +64,30 @@ import qualified Data.List as List
 import Data.Maybe
 import Prelude hiding (lookup, map)
 
+type Rank = Int
+
+data Node
+  = NodeRepresentative {-# UNPACK #-}!Rank
+  | NodeLink {-# UNPACK #-}!Int -- link to parent Node
+
 {-| Represents a disjoint set of integers. -}
-data IntDisjointSet = IntDisjointSet { parents :: IntMap.IntMap Int,
-                                       ranks   :: IntMap.IntMap Int }
+data IntDisjointSet = IntDisjointSet
+  { -- numSets is maintained in the data structure so we can implement
+    -- O(1) disjointSetSize:
+    numSets :: {-# UNPACK #-}!Int
+  , nodes :: !(IntMap.IntMap Node)
+  }
 
 instance Show IntDisjointSet where
     show = ("fromList " ++) . show . fst . toList
 
 {-| Create a disjoint set with no members. O(1). -}
 empty :: IntDisjointSet
-empty = IntDisjointSet IntMap.empty IntMap.empty
+empty = IntDisjointSet 0 IntMap.empty
 
 {-| Create a disjoint set with one member. O(1). -}
 singleton :: Int -> IntDisjointSet
-singleton !x = let p = IntMap.singleton x x
-                   r = IntMap.singleton x 0
-               in  p `seq` r `seq` IntDisjointSet p r
+singleton !x = IntDisjointSet 1 $ IntMap.singleton x $! NodeRepresentative 0
 
 {-|
 Insert x into the disjoint set.
@@ -88,13 +96,12 @@ otherwise x has no equivalence relations.
 O(logn).
 -}
 insert :: Int -> IntDisjointSet -> IntDisjointSet
-insert !x set@(IntDisjointSet p r) =
-    let (l, p') = IntMap.insertLookupWithKey (\_ _ old -> old) x x p
+insert !x set@(IntDisjointSet count p) =
+    let v = NodeRepresentative 0
+        (l, p') = IntMap.insertLookupWithKey (\_ _ old -> old) x v p
     in  case l of
           Just _  -> set
-          Nothing ->
-              let r' = IntMap.insert x 0 r
-              in  p' `seq` r' `seq` IntDisjointSet p' r'
+          Nothing -> IntDisjointSet (count+1) p'
 
 {-|
 Given two instances of disjoint sets that share no members in common,
@@ -105,8 +112,8 @@ sets share no members in common and in the event that a member
 overlaps, the resulting set may have incorrect equivalence relations.
 -}
 unsafeMerge :: IntDisjointSet -> IntDisjointSet -> IntDisjointSet
-unsafeMerge (IntDisjointSet p1 r1) (IntDisjointSet p2 r2) =
-    IntDisjointSet (IntMap.union p1 p2) (IntMap.union r1 r2)
+unsafeMerge (IntDisjointSet c1 p1) (IntDisjointSet c2 p2) =
+    IntDisjointSet (c1+c2) (IntMap.union p1 p2)
 
 {-|
 Create an equivalence relation between x and y.
@@ -123,23 +130,31 @@ child of y and the rank of y is increase by 1.
 If either x or y is not present in the input set, nothing is done.
 -}
 union :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-union !x !y set = flip execState set $ runMaybeT $ do
-  repx <- MaybeT $ state $ lookup x
-  repy <- MaybeT $ state $ lookup y
-  guard $ repx /= repy
-  (IntDisjointSet p r) <- get
-  let rankx = r IntMap.! repx
-  let ranky = r IntMap.! repy
-  put $! case compare rankx ranky of
-    LT -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
-    GT -> let p' = IntMap.insert repy repx p
-              r' = IntMap.delete repy r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
-    EQ -> let p' = IntMap.insert repx repy p
-              r' = IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
-          in  p' `seq` r' `seq` IntDisjointSet p' r'
+union x y set = snd $ unionRep x y set
+
+unionRep :: Int -> Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
+unionRep !x !y set = flip runState set $ runMaybeT $ do
+  (repx, rankx) <- MaybeT $ state $ compressedFind x
+  (repy, ranky) <- MaybeT $ state $ compressedFind y
+  if repx == repy
+    then return repx
+    else do
+      IntDisjointSet count newSet <- get
+      let unify low high updateRank = do
+            put $! IntDisjointSet (count-1) $ updateRank $
+              IntMap.insert low (NodeLink high) newSet
+            return high
+      case compare rankx ranky of
+        LT -> unify repx repy id
+        GT -> unify repy repx id
+        EQ -> unify repx repy $ IntMap.insert repy (NodeRepresentative (ranky + 1))
+
+compressedFind :: Int -> IntDisjointSet -> (Maybe (Int, Rank), IntDisjointSet)
+compressedFind !x set =
+  case find x set of
+    Nothing          -> (Nothing, set)
+    Just (rep, rank) -> let !compressedSet = compress rep x set
+                        in  (Just (rep, rank), compressedSet)
 
 {-|
 Find the set representative for this input.
@@ -147,16 +162,14 @@ This performs path compression and so is stateful.
 Amortized O(logn * \alpha(n)).
 -}
 lookup :: Int -> IntDisjointSet -> (Maybe Int, IntDisjointSet)
-lookup !x set =
-  case find x set of
-    Nothing  -> (Nothing, set)
-    Just rep -> let set' = compress rep x set
-                in  set' `seq` (Just rep, set')
+lookup !x set = (fmap fst mPair, newSet)
+  where
+    (mPair, newSet) = compressedFind x set
 
 {-| Return a list of all the elements. -}
 -- This is stateful for consistency and possible future revisions.
 elems :: IntDisjointSet -> ([Int], IntDisjointSet)
-elems = IntMap.keys . parents &&& id
+elems = IntMap.keys . nodes &&& id
 
 {-|
 Generate an association list of each element and its representative,
@@ -185,41 +198,43 @@ equivalent !x !y set = first (fromMaybe False) $
                          repy <- MaybeT $ state $ lookup y
                          return $! repx == repy
 
-{-| Return the number of disjoint sets. O(1). -}
+{-| Return the number of disjoint sets. O(N). -}
 disjointSetSize :: IntDisjointSet -> Int
-disjointSetSize = IntMap.size . ranks
+disjointSetSize = numSets
 
 {-| Return the number of elements in all disjoint sets. O(1). -}
 size :: IntDisjointSet -> Int
-size = IntMap.size . parents
+size = IntMap.size . nodes
 
 {-|
 Map each member to another Int.
 The map function must be a bijection, i.e. 1-to-1 mapping.
 -}
 map :: (Int -> Int) -> IntDisjointSet -> IntDisjointSet
-map f (IntDisjointSet p r) =
-  let p' = IntMap.fromList $ List.map (f *** f) $ IntMap.toList p
-      r' = IntMap.fromList $ List.map (first f) $ IntMap.toList r
-  in  p' `seq` r' `seq` IntDisjointSet p' r'
+map f (IntDisjointSet count p) =
+  let mapNode old@(NodeRepresentative _) = old
+      mapNode (NodeLink parent) = NodeLink (f parent)
+      p' = IntMap.fromList $ List.map (f *** mapNode) $ IntMap.toList p
+  in  IntDisjointSet count p'
 
 -- Find the set representative.
 -- This traverses parents until the parent of y == y and returns y.
-find :: Int -> IntDisjointSet -> Maybe Int
-find !x (IntDisjointSet p _) =
-  do x' <- IntMap.lookup x p
-     return $! if x == x' then x' else find' x'
-  where find' y = let y' = p IntMap.! y
-                  in  if y == y' then y' else find' y'
+find :: Int -> IntDisjointSet -> Maybe (Int, Rank)
+find !x (IntDisjointSet _ set) =
+  do node <- IntMap.lookup x set
+     Just $ case node of
+       NodeRepresentative rank -> (x, rank)
+       NodeLink x' -> find' x'
+  where find' y = case set IntMap.! y of
+                    NodeRepresentative rank -> (y, rank)
+                    NodeLink y' -> find' y'
 
 -- Given a start node and its representative, compress
 -- the path to the root.
 compress :: Int -> Int -> IntDisjointSet -> IntDisjointSet
-compress !rep = helper
-    where helper !x set@(IntDisjointSet p r)
-              | x == rep  = set
-              | otherwise = helper x' set'
-              where x'    = p IntMap.! x
-                    set'  = let p' = IntMap.insert x rep p
-                            in  p' `seq` IntDisjointSet p' r
-
+compress !rep !leaf (IntDisjointSet count orig) = IntDisjointSet count $ helper leaf orig
+    where helper !x p
+              | x == rep  = p
+              | otherwise = helper x' p'
+              where NodeLink x' = p IntMap.! x
+                    p' = IntMap.insert x (NodeLink rep) p
