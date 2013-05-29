@@ -126,10 +126,11 @@ union !x !y set = flip execState set $ runMaybeT $ do
   (IntDisjointSet p r) <- get
   let rankx = r IntMap.! repx
   let ranky = r IntMap.! repy
+  let unify low high newranks = (IntDisjointSet $! IntMap.insert low high p) $! IntMap.delete low newranks
   put $! case compare rankx ranky of
-    LT -> (IntDisjointSet $! IntMap.insert repx repy p) $! IntMap.delete repx $! r
-    GT -> (IntDisjointSet $! IntMap.insert repy repx p) $! IntMap.delete repy $! r
-    EQ -> (IntDisjointSet $! IntMap.insert repx repy p) $! IntMap.delete repx $! IntMap.insert repy (ranky + 1) r
+    LT -> unify repx repy r
+    GT -> unify repy repx r
+    EQ -> unify repx repy $! IntMap.insert repy (ranky + 1) r
 
 {-|
 Find the set representative for this input.
